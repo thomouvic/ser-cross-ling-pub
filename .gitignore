@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+embeddings_cache/
+.DS_Store

@@ -1,0 +1,17 @@
+name: ser-audit
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - pytorch>=2.0          # CPU is sufficient for probing on cached embeddings
+  - pip
+  - pip:
+      - transformers>=4.40  # extracting per-layer features from HuggingFace encoders
+      - librosa             # audio loading for extraction
+      - soundfile
+      # - funasr            # only needed to extract emotion2vec features

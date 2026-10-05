@@ -1,0 +1,103 @@
+"""Claim 2 verification: per-language probe on Thai for all 4 models.
+
+Compares HuBERT, WavLM (when ready), emotion2vec_base, emotion2vec_plus_base on
+Thai SER (a language NOT in EmoBox). If `_plus_base` doesn't outperform `_base`
+on Thai, the published `_plus` advantage on the other languages is largely
+contamination-driven (since `_plus_seed` was fine-tuned on EmoBox data including
+all our other test languages).
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import accuracy_score, f1_score
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from load import load_embeddings, MODEL_ALIAS_WITH_PLUS
+from superb_probe import SuperbProbe
+
+RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+EMOTION_4CLASS = ["angry", "happy", "neutral", "sad"]
+RNG_SEED = 20260505
+
+
+def speaker_split(meta, train_frac=0.6, rng=None):
+    if rng is None:
+        rng = np.random.default_rng(RNG_SEED)
+    speakers = sorted(meta["speaker_id"].unique())
+    rng.shuffle(speakers)
+    n_train = max(1, int(round(train_frac * len(speakers))))
+    train_speakers = set(speakers[:n_train])
+    train_mask = meta["speaker_id"].isin(train_speakers).to_numpy()
+    return train_mask, ~train_mask
+
+
+def bootstrap_metric(y_true, y_pred, fn, n=1000, seed=RNG_SEED):
+    rng = np.random.default_rng(seed)
+    point = float(fn(y_true, y_pred))
+    if len(y_true) < 2: return point, point, point
+    samples = []
+    for _ in range(n):
+        idx = rng.integers(0, len(y_true), size=len(y_true))
+        samples.append(fn(y_true[idx], y_pred[idx]))
+    arr = np.asarray(samples)
+    return point, float(np.percentile(arr, 2.5)), float(np.percentile(arr, 97.5))
+
+
+def probe_thai(model: str) -> dict | None:
+    try:
+        emb, meta = load_embeddings("thai_ser", model, layer=None)
+    except FileNotFoundError:
+        return None
+    if emb.ndim != 3:
+        # Some models might still be utterance-level (e.g., if extraction was old)
+        # Just standardize to 3-D for SUPERB
+        emb = emb[:, np.newaxis, :]
+
+    train_mask, test_mask = speaker_split(meta)
+    Xtr, Xte = emb[train_mask], emb[test_mask]
+    label_to_int = {e: i for i, e in enumerate(EMOTION_4CLASS)}
+    ytr = np.asarray([label_to_int[y] for y in meta.loc[train_mask, "emotion"]])
+    yte = np.asarray([label_to_int[y] for y in meta.loc[test_mask, "emotion"]])
+
+    probe = SuperbProbe(n_layers=emb.shape[1], dim=emb.shape[2],
+                       n_classes=len(EMOTION_4CLASS), lr=1e-3, weight_decay=1e-4,
+                       epochs=100, batch_size=256, seed=RNG_SEED)
+    probe.fit(Xtr, ytr)
+    pred = probe.predict(Xte)
+    acc, acc_lo, acc_hi = bootstrap_metric(yte, pred, accuracy_score)
+    f1, f1_lo, f1_hi = bootstrap_metric(
+        yte, pred, lambda y, p: f1_score(y, p, average="macro", zero_division=0))
+
+    return {
+        "model": model, "n_train": int(train_mask.sum()), "n_test": int(test_mask.sum()),
+        "n_test_speakers": meta.loc[test_mask, "speaker_id"].nunique(),
+        "accuracy": acc, "accuracy_ci_lo": acc_lo, "accuracy_ci_hi": acc_hi,
+        "macro_f1": f1, "macro_f1_ci_lo": f1_lo, "macro_f1_ci_hi": f1_hi,
+    }
+
+
+def main():
+    rows = []
+    for m in MODEL_ALIAS_WITH_PLUS:
+        res = probe_thai(m)
+        if res is None:
+            print(f"{m:25s}  NOT YET EXTRACTED")
+            continue
+        rows.append(res)
+        print(f"{m:25s}  acc={res['accuracy']:.3f} [{res['accuracy_ci_lo']:.3f}, {res['accuracy_ci_hi']:.3f}]  "
+              f"F1={res['macro_f1']:.3f}  n_test={res['n_test']} ({res['n_test_speakers']} spk)")
+    if rows:
+        df = pd.DataFrame(rows)
+        out = RESULTS_DIR / "probe_thai_summary.csv"
+        df.to_csv(out, index=False)
+        print(f"\nSaved {out}")
+
+
+if __name__ == "__main__":
+    main()

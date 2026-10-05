@@ -1,0 +1,4 @@
+model,n_train_speakers,n_holdout_speakers,holdout_pre_inlp_speaker_acc,holdout_post_inlp_speaker_acc,inlp_iters
+hubert,93,62,0.9579172610556348,0.666904422253923,11
+wavlm,93,62,0.9600570613409415,0.6640513552068473,12
+emotion2vec,93,62,0.8209700427960057,0.4550641940085592,10
