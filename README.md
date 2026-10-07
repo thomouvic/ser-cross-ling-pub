@@ -1,7 +1,26 @@
 # Cross-Lingual SER Audit: code and data
 
-Code and data for the TMLR paper *"Re-Examining emotion2vec's Cross-Lingual Advantage: A
-Confound-Controlled Comparison of Self-Supervised Speech Models."*
+Code and data for the paper
+
+> Alex Thomo. *Re-Examining emotion2vec's Cross-Lingual Advantage: A Confound-Controlled Comparison
+> of Self-Supervised Speech Models.* Transactions on Machine Learning Research (TMLR), 2026.
+> [OpenReview](https://openreview.net/forum?id=RBUnKFHagf) ·
+> [PDF](https://openreview.net/pdf?id=RBUnKFHagf)
+
+If you use this code or the embeddings, please cite:
+
+```bibtex
+@article{thomo2026reexamining,
+  title   = {Re-Examining emotion2vec's Cross-Lingual Advantage: A Confound-Controlled Comparison of Self-Supervised Speech Models},
+  author  = {Alex Thomo},
+  journal = {Transactions on Machine Learning Research},
+  issn    = {2835-8856},
+  year    = {2026},
+  url     = {https://openreview.net/forum?id=RBUnKFHagf}
+}
+```
+
+The embeddings are archived on OSF: https://doi.org/10.17605/OSF.IO/8VCH9
 
 ## What's here
 - `analysis/`: SUPERB-style probing, cross-lingual transfer (zero-shot and speaker-disjoint
